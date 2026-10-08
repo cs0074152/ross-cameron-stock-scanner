@@ -11,13 +11,19 @@
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)
 ![License](https://img.shields.io/badge/License-MIT-blue)
 
-[项目介绍](https://cs0074152.github.io/ross-cameron-stock-scanner/) · [快速开始](#快速开始) · [功能预览](#功能预览) · [详细指南](docs/GUIDE.md) · [反馈问题](https://github.com/cs0074152/ross-cameron-stock-scanner/issues)
+[项目介绍](https://cs0074152.github.io/ross-cameron-stock-scanner/) · [快速开始](#快速开始) · [功能预览](#功能预览) · [详细指南](docs/GUIDE.md) · [免责声明](DISCLAIMER.md) · [反馈问题](https://github.com/cs0074152/ross-cameron-stock-scanner/issues)
 
 </div>
 
 这是一个在本机运行的股票行情观察工具：在美股与沪深京 A 股之间切换，用清晰的数值条件缩小关注范围，再结合图表、报价时间和模拟持仓记录进行复盘。行情每 15 秒尝试刷新，中文界面支持深浅主题。
 
 **行情榜单属于样本；策略是快照观察；所有买入与平仓按钮都是模拟记账，不连接券商，也不提交真实订单。** 本项目是 [Jayanth7416/ross-cameron-stock-scanner](https://github.com/Jayanth7416/ross-cameron-stock-scanner) 的中文双市场扩展，与 Ross Cameron、Warrior Trading 及行情提供方没有官方关联。
+
+## 免责声明
+
+**使用风险及损失由使用者自行承担。在适用法律允许的最大范围内，因使用、无法使用本软件或依赖其数据、图表、信号及模拟结果产生的任何直接或间接损失，包括投资或交易亏损、资金损失、数据丢失及业务中断，作者、贡献者及维护者不承担责任，也不承担赔偿或补偿义务。依法不得免除或限制的责任除外。**
+
+软件按“现状”和“可用状态”提供，不保证数据准确、及时或软件持续可用，不构成投资建议或收益承诺。请独立判断、核实行情并备份数据，阅读 [完整免责声明](DISCLAIMER.md)。
 
 ## 你可以用它做什么
 
