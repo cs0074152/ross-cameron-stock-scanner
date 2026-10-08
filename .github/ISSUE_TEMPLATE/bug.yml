@@ -1,0 +1,36 @@
+name: 问题反馈
+description: 反馈启动、行情、界面或模拟记账问题
+title: "[问题] "
+body:
+  - type: markdown
+    attributes:
+      value: 请勿上传密钥、.env、真实持仓或敏感日志。使用演示数据描述问题。
+  - type: input
+    id: environment
+    attributes:
+      label: 环境
+      description: 系统、Node.js 版本、项目提交或版本
+    validations:
+      required: true
+  - type: dropdown
+    id: market
+    attributes:
+      label: 涉及市场
+      options:
+        - 美股
+        - A股
+        - 启动或通用界面
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重现步骤与实际结果
+      description: 说明做了什么、期望什么、实际发生了什么
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏截图或日志
+      description: 提供数据源错误、报价时间等有用线索；隐藏私人信息

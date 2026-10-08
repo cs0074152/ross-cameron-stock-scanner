@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 使用指南
+    url: https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/GUIDE.md
+    about: 先检查启动、数据来源与常见问题说明
