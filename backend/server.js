@@ -7,6 +7,7 @@ const http = require('http');
 const path = require('path');
 const { randomUUID } = require('crypto');
 const { createSafeFetch } = require('./safe-fetch');
+const { createNewsService } = require('./news-service');
 const { getMarketInfo } = require('./market-calendar');
 const { createUSProvider } = require('./market-us');
 const { fetchChinaSnapshot, fetchChinaQuotes } = require('./market-cn');
@@ -57,6 +58,7 @@ function createScannerServer(options = {}) {
   const now = options.now || Date.now;
   const info = (market, at = now()) => getMarketInfo(market, new Date(at));
   const safeFetch = options.safeFetch || createSafeFetch();
+  const newsService = options.newsService || createNewsService({ safeFetch, now });
   const us = options.usProvider || createUSProvider(safeFetch);
   const cnSnapshot = options.cnSnapshot || (signal => fetchChinaSnapshot(safeFetch, signal));
   const cnQuotes = options.cnQuotes || ((symbols, signal) => fetchChinaQuotes(safeFetch, symbols, signal));
@@ -270,6 +272,12 @@ function createScannerServer(options = {}) {
     watched[market].set(symbol, now() + 30 * 60 * 1000);
     res.json({ ok: true });
   }));
+  app.get('/api/news/:symbol', wrap(async (req, res) => {
+    const market = getMarket(req), symbol = req.params.symbol.toUpperCase();
+    if (!validSymbol(symbol, market)) return res.status(400).json({ error: '股票代码格式无效' });
+    if (req.query.refresh !== undefined && !['0', '1'].includes(req.query.refresh)) return res.status(400).json({ error: 'refresh 必须为 0 或 1' });
+    res.json(await newsService.get(market, symbol, { refresh: req.query.refresh === '1' }));
+  }));
   app.get('/api/positions', wrap((req, res) => res.json(positionResponse(getMarket(req)))));
   app.get('/api/trades', wrap((req, res) => {
     const market = getMarket(req);
@@ -299,6 +307,7 @@ function createScannerServer(options = {}) {
   }));
   app.use((error, req, res, next) => {
     if (res.headersSent) return next(error);
+    if (error.status === 429 && error.retryAfter) res.set('Retry-After', String(error.retryAfter));
     res.status(error.status || 500).json({ error: error.status ? error.message : '服务处理失败，请重试' });
     if (!error.status) console.error(error);
   });
@@ -320,6 +329,7 @@ function createScannerServer(options = {}) {
     });
   }
   async function stop() {
+    newsService.close();
     intervals.forEach(clearInterval);
     for (const client of wss.clients) client.terminate();
     await new Promise(resolve => wss.close(resolve));

@@ -10,6 +10,8 @@ test('URL validation blocks reserved hosts, credentials, alternate ports and pro
     assert.throws(() => assertSafeUrl(url), /blocked/);
   }
   assert.equal(assertSafeUrl('https://STOCKANALYSIS.com/x'), 'https://stockanalysis.com/x');
+  assert.equal(assertSafeUrl('https://www.cninfo.com.cn/new/data/szse_stock.json'), 'https://www.cninfo.com.cn/new/data/szse_stock.json');
+  for (const url of ['https://cninfo.com.cn/', 'https://www.cninfo.com.cn.attacker.invalid/', 'https://static.cninfo.com.cn/']) assert.throws(() => assertSafeUrl(url), /blocked/);
 });
 
 test('every redirect is checked before network access; no cookie leakage on host change', async () => {
