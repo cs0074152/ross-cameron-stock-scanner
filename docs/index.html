@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="美股与沪深京A股双市场中文扫描器。本机运行，提供行情筛选、TradingView图表、策略观察和模拟持仓记账。">
+  <meta name="theme-color" content="#102036">
+  <meta property="og:title" content="Scanner Desk · 美股与A股双市场扫描器">
+  <meta property="og:description" content="一个中文观察工作台：从榜单筛选，到图表观察，再到模拟持仓复盘。">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://cs0074152.github.io/ross-cameron-stock-scanner/">
+  <meta property="og:image" content="https://cs0074152.github.io/ross-cameron-stock-scanner/media/scanner-cn.jpg">
+  <title>Scanner Desk · 美股 / A 股双市场扫描器</title>
+  <link rel="icon" href="media/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">跳至主要内容</a>
+<header class="site-header"><nav class="nav wrap" aria-label="主要导航">
+  <a class="brand" href="#"><img src="media/logo.svg" width="32" height="32" alt=""><span>Scanner<span class="brand-light"> Desk</span></span></a>
+  <div class="nav-links"><a href="#features">功能</a><a href="#preview">预览</a><a href="#start">快速开始</a><a class="nav-github" href="https://github.com/cs0074152/ross-cameron-stock-scanner" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a></div>
+</nav></header>
+<main id="main">
+<section class="hero wrap">
+  <div class="hero-copy"><p class="eyebrow"><span class="status-dot"></span> LOCAL FIRST · 中文双市场工作台</p>
+    <h1>美股与 A 股，<br><span>一个观察工作台。</span></h1>
+    <p class="hero-lead">从榜单筛选，到图表观察，再到模拟持仓复盘。把关注的价格、时间与风险，放在同一个清晰界面里。</p>
+    <div class="hero-actions"><a class="button primary" href="#start">开始使用 <span aria-hidden="true">↓</span></a><a class="button secondary" href="https://github.com/cs0074152/ross-cameron-stock-scanner" target="_blank" rel="noopener noreferrer">查看源码 ↗</a></div>
+    <p class="hero-note">本机运行 · 中文深浅主题 · 模拟记账，不提交真实订单</p>
+    <div class="hero-metrics"><div><strong>2</strong><span>独立市场模式</span></div><div><strong>15<span>s</span></strong><span>尝试刷新行情</span></div><div><strong>~0.86<span>s</span></strong><span>缓存服务启动¹</span></div></div>
+  </div>
+  <div class="product-visual">
+    <div class="visual-top"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span>SCANNER DESK</span><span class="demo-badge">交互示意 · 演示数据</span></div>
+    <div class="demo-content"><div class="demo-heading"><span>市场观察</span><div class="market-switch" role="group" aria-label="切换演示市场"><button class="active" data-market="US" aria-pressed="true">美股</button><button data-market="CN" aria-pressed="false">A 股</button></div></div>
+      <div class="demo-stats"><div><span>领先样本</span><strong id="demo-leader">DEMOA</strong></div><div><span>报价口径</span><strong id="demo-currency">USD · 美东时间</strong></div></div>
+      <div class="demo-table-wrap"><table class="demo-table"><thead><tr><th>代码 / 名称</th><th>价格</th><th>涨幅</th><th>量比</th></tr></thead><tbody id="demo-rows"><tr><td>DEMOA<small>示例科技</small></td><td>$8.62</td><td class="up-us">+18.40%</td><td>5.6×</td></tr><tr><td>DEMOB<small>示例医疗</small></td><td>$6.15</td><td class="up-us">+12.80%</td><td>4.2×</td></tr><tr><td>DEMOC<small>示例能源</small></td><td>$4.28</td><td class="up-us">+9.60%</td><td>3.1×</td></tr></tbody></table></div>
+      <div class="demo-chart"><div><span>价格样本示意</span><span>观察 · 等待 · 核实</span></div><svg viewBox="0 0 520 110" role="img" aria-label="演示价格趋势，不是真实行情"><path d="M0 95H520M0 55H520M0 15H520" class="chart-grid"/><path d="M0 88 34 77 68 84 100 60 132 67 163 43 196 50 229 25 261 35 294 60 327 54 360 43 393 48 426 30 459 27 492 13 520 19" class="chart-line"/></svg></div>
+      <div class="demo-footer"><span class="status-dot"></span><span id="demo-rule">美股 · 独立筛选条件</span><span>榜单样本，不代表全市场</span></div>
+    </div>
+  </div>
+</section>
+<div class="trust-strip wrap"><span>React 18</span><span>Node.js</span><span>WebSocket</span><span>TradingView</span><span class="trust-label">为本机观察与复盘而设计</span></div>
+<section id="features" class="section wrap"><div class="section-heading"><p class="eyebrow">从发现，到记录</p><h2>每一步，都有明确的信息。</h2><p>把公开行情转化为可检查的关注名单，保留数据的来源、时效与局限。</p></div>
+  <div class="feature-grid">
+    <article class="feature"><span class="feature-number">01 / 市场</span><h3>美股与沪深京 A 股</h3><p>切换市场，同步调整币种、时区、涨跌颜色与观察条件。A 股单独展示板块和 T+1 状态。</p></article>
+    <article class="feature"><span class="feature-number">02 / 筛选</span><h3>把范围缩小到关注名单</h3><p>按价格、涨幅、量比与流通股数筛选当前榜单样本，配合接近日高和真实开盘跳空观察。</p></article>
+    <article class="feature"><span class="feature-number">03 / 图表</span><h3>从数值走向结构</h3><p>点击股票打开 TradingView 图表，保留选中股票并独立查询报价；不支持的股票提供备用链接。</p></article>
+    <article class="feature"><span class="feature-number">04 / 时效</span><h3>看得到报价的时间</h3><p>区分源报价时间与抓取成功时间。缺失指标显示“—”，源失败保留旧数据并提示，避免误读。</p></article>
+    <article class="feature"><span class="feature-number">05 / 复盘</span><h3>模拟持仓，持续记账</h3><p>手动记录入场、止损与目标，观察峰值和报价状态。按市场和交易日期归档，重启后恢复持仓。</p></article>
+    <article class="feature"><span class="feature-number">06 / 启动</span><h3>轻量打开，按需加载</h3><p>构建完成后使用本机缓存；策略页按需加载。成功榜单先显示，额外指标与独立报价随后补齐。</p></article>
+  </div>
+</section>
+<section id="preview" class="section preview-section"><div class="wrap"><div class="section-heading"><p class="eyebrow">界面预览</p><h2>中文界面，信息各就其位。</h2><p>以下为隔离演示环境的实际界面截图，不含真实用户持仓。截图里的数值仅用于展示功能。</p></div>
+  <div class="gallery"><figure><a href="media/scanner-cn.jpg" target="_blank" rel="noopener noreferrer" aria-label="查看完整A股扫描器截图"><img src="media/scanner-cn.jpg" alt="A股扫描器演示界面：榜单、数值筛选和报价时间" loading="lazy" width="1280" height="720"></a><figcaption><span>01 / A 股扫描器</span>从榜单样本建立关注名单</figcaption></figure><figure><a href="media/strategy-cn.jpg" target="_blank" rel="noopener noreferrer" aria-label="查看完整策略观察中心截图"><img src="media/strategy-cn.jpg" alt="A股策略观察中心演示界面：T+1说明、观察池与模拟记账" loading="lazy" width="1280" height="720"></a><figcaption><span>02 / 策略与复盘</span>观察风险，记录模拟过程</figcaption></figure></div>
+</div></section>
+<section class="section wrap market-section"><div class="section-heading"><p class="eyebrow">双市场，独立规则</p><h2>按市场理解每一条信息。</h2></div><div class="market-cards"><article><p class="market-label">US / 美股</p><h3>美元与美东交易日</h3><ul><li>美东时区，处理夏令时与交易日历</li><li>盘前、盘中、盘后来源分别处理</li><li>低流通盘、量比、跳空等数值观察</li><li>快照雷达形成真实时间窗口，仍需看图核实</li></ul></article><article><p class="market-label">CN / 沪深京 A 股</p><h3>人民币与北京交易日</h3><ul><li>红涨绿跌，处理午休和集合竞价</li><li>板块、风险标签和涨跌幅估算说明</li><li>独立候选条件，不复制美元价格阈值</li><li>T+1 按最新买入日期和实际交易日判断</li></ul></article></div></section>
+<section id="start" class="section start-section"><div class="wrap start-grid"><div><p class="eyebrow">几步开始</p><h2>下载，启动，<br>建立你的关注名单。</h2><p class="start-lead">安装 Node.js ≥22.12.0 与 npm，建议 Node 24。首次启动自动准备所需组件，完成后保留构建缓存。</p><a class="button primary" href="https://github.com/cs0074152/ross-cameron-stock-scanner/archive/refs/heads/main.zip">下载源码 ZIP ↗</a><p class="small-note">Windows 可双击 create-desktop-shortcut.bat 创建桌面入口。无需管理员权限，不设置开机自启。</p></div>
+  <div class="install-card"><div class="install-tabs" role="tablist" aria-label="选择安装系统"><button role="tab" id="tab-windows" data-platform="windows" aria-controls="panel-windows" aria-selected="true" class="active">Windows</button><button role="tab" id="tab-unix" data-platform="unix" aria-controls="panel-unix" aria-selected="false" tabindex="-1">macOS / Linux</button></div>
+    <div role="tabpanel" id="panel-windows" aria-labelledby="tab-windows" class="install-panel"><ol><li>安装 <a href="https://nodejs.org/" target="_blank" rel="noopener noreferrer">Node.js</a>，下载 ZIP 并解压。</li><li>双击项目目录中的 <code>start.bat</code>。</li><li>等待启动完成，默认浏览器自动打开。</li></ol><div class="command"><pre><code>git clone https://github.com/cs0074152/ross-cameron-stock-scanner.git
+cd ross-cameron-stock-scanner
+.\start.bat</code></pre><button class="copy-button" data-copy="windows" aria-label="复制Windows启动命令">复制</button></div></div>
+    <div role="tabpanel" id="panel-unix" aria-labelledby="tab-unix" class="install-panel" hidden><ol><li>安装 Node.js ≥22.12.0 与 npm。</li><li>克隆或解压项目，在目录中执行启动命令。</li><li>按启动窗口显示的地址打开浏览器。</li></ol><div class="command"><pre><code>git clone https://github.com/cs0074152/ross-cameron-stock-scanner.git
+cd ross-cameron-stock-scanner
+bash start.sh</code></pre><button class="copy-button" data-copy="unix" aria-label="复制macOS或Linux启动命令">复制</button></div></div>
+    <p class="install-footnote">默认页面 localhost:5173。端口占用时会自动选择空闲端口，以实际提示为准。停止服务用 Ctrl+C。</p><p id="copy-status" role="status" aria-live="polite"></p>
+  </div>
+</div></section>
+<section class="section wrap boundaries"><div class="section-heading"><p class="eyebrow">数据说明</p><h2>清楚知道，工具提供了什么。</h2></div><div class="boundary-grid"><article><h3>公开行情，有来源也有延迟</h3><p>美股使用 Yahoo Finance 与 StockAnalysis，A 股使用东方财富；图表由 TradingView 加载。公开接口可能延迟、限流或变化，连接成功不等于报价已经更新。</p></article><article><h3>数值观察，保留人工核实</h3><p>榜单是样本，不覆盖全市场。快照不是完整 K 线，也不包含 Level 2、逐笔成交或新闻验证。未知和过期指标不会被自动当作有效值。</p></article><article><h3>本机记账，保持明确边界</h3><p>持仓与收据保存到本机，不进入 Git 仓库。所有登记与平仓均为模拟，不连接券商；GitHub Pages 仅承载这份介绍，不运行行情后台。</p></article></div></section>
+<section class="section wrap faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>开始之前，你可能想了解。</h2></div>
+<details><summary>需要申请 API Key 吗？</summary><p>当前实现不需要填写商业行情 API Key；公开行情来源可能有时效、访问频率和使用条款限制。</p></details>
+<details><summary>页面打开了，为什么没有新行情？</summary><p>查看连接状态、源错误和报价时间。休市、公开接口限流或网络不通可能导致等待；系统保留最后有效数据并说明状态。外部图表的加载速度也受网络影响。</p></details>
+<details><summary>重启或换浏览器会清空持仓吗？</summary><p>持仓由本机后端保存到 backend/data/positions.json，换浏览器会重新对账。换电脑前先停止服务并备份该文件。浏览器还保存本机显示设置与盈亏镜像。</p></details>
+<details><summary>它会自动下单或计算真实收益吗？</summary><p>不会。登记与平仓是模拟记账；盈亏基于最近有效源报价，未扣手续费，不能代表真实成交、收益或交易建议。</p></details>
+<details><summary>能部署为多人网站吗？</summary><p>当前版本是本机单用户工具，服务只允许回环地址。多人使用需要额外的身份认证、权限和数据隔离设计。本页只是项目介绍。</p></details>
+</section>
+<section class="final-cta wrap"><div><p class="eyebrow">把观察过程记录下来</p><h2>从一个清晰的工作台开始。</h2></div><a class="button primary" href="https://github.com/cs0074152/ross-cameron-stock-scanner">前往 GitHub ↗</a></section>
+</main>
+<footer class="site-footer wrap"><div class="footer-top"><span class="brand">Scanner<span class="brand-light"> Desk</span></span><div><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/GUIDE.md">使用指南</a><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/issues">反馈建议</a><a href="https://github.com/Jayanth7416/ross-cameron-stock-scanner">原始项目</a></div></div><p>基于 Jayanth7416 的项目扩展，中文双市场版本由 cs0074152 维护。MIT · 非官方项目。</p><p>¹ 2026-10-08 Windows / Node 24 本机测量，已缓存构建的服务就绪指标，不含浏览器与外部图表加载。<a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/PERFORMANCE.md">查看方法</a></p><p>仅用于学习、行情观察与模拟复盘。图片和交互示例使用演示数据。</p></footer>
+</body></html>
