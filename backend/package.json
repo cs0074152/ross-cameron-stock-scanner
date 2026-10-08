@@ -1,12 +1,14 @@
 {
   "name": "ross-cameron-scanner-backend",
   "version": "2.0.0",
-  "description": "Ross Cameron Style Stock Scanner with Polygon.io Real-Time Data",
+  "description": "Local US and China A-share quote scanner with position monitoring",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "test": "node --test"
   },
+  "engines": { "node": ">=22.12.0" },
   "dependencies": {
     "cheerio": "^1.1.2",
     "cors": "^2.8.5",

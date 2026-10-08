@@ -1,527 +1,335 @@
+// 本文件仅协调模块、API 与轮询；行情、策略、持仓存储均可独立测试。
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { WebSocketServer, WebSocket } = require('ws');
 const http = require('http');
-const cheerio = require('cheerio');
-
-const app = express();
-const PORT = process.env.PORT || 3001;
-
-app.use(cors());
-app.use(express.json());
-
-const server = http.createServer(app);
-const wss = new WebSocketServer({ server });
-
-// Cache for stock data
-let stockCache = {
-  gainers: [],
-  losers: [],
-  mostActive: [],
-  premarket: [],
-  afterhours: [],
-  fivePillars: [],
-  hodMomentum: [],
-  gapScanner: []
-};
-
-let lastUpdateTime = null;
-
-// Market session detection (Eastern Time)
-function getMarketSession() {
-  const now = new Date();
-  const etTime = new Date(now.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const hours = etTime.getHours();
-  const minutes = etTime.getMinutes();
-  const day = etTime.getDay();
-
-  if (day === 0 || day === 6) return 'closed';
-
-  const timeInMinutes = hours * 60 + minutes;
-
-  if (timeInMinutes >= 240 && timeInMinutes < 570) return 'premarket';
-  if (timeInMinutes >= 570 && timeInMinutes < 960) return 'regular';
-  if (timeInMinutes >= 960 && timeInMinutes < 1200) return 'afterhours';
-
-  return 'closed';
-}
-
-function getETTime() {
-  const now = new Date();
-  return now.toLocaleString('en-US', {
-    timeZone: 'America/New_York',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true
-  });
-}
-
-// Parse volume/market cap string to number
-function parseVolumeString(str) {
-  if (!str) return 0;
-  str = str.toString().replace(/,/g, '').trim();
-  const num = parseFloat(str);
-  if (str.endsWith('M')) return num * 1000000;
-  if (str.endsWith('B')) return num * 1000000000;
-  if (str.endsWith('K')) return num * 1000;
-  return num || 0;
-}
-
-// Scrape pre-market gainers from stockanalysis.com using HTML table
-async function scrapePremarketGainers() {
-  try {
-    const url = 'https://stockanalysis.com/markets/premarket/gainers/';
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Accept-Language': 'en-US,en;q=0.5',
-      }
-    });
-
-    if (!response.ok) {
-      console.error('Failed to fetch premarket gainers:', response.status);
-      return [];
-    }
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const stocks = [];
-
-    // Parse HTML table: td0=rank, td1=symbol, td2=name, td3=change%, td4=price, td5=volume, td6=marketCap
-    $('tbody tr').each((index, row) => {
-      const tds = $(row).find('td');
-      if (tds.length >= 5) {
-        const symbol = $(tds[1]).text().trim();
-        const name = $(tds[2]).text().trim();
-        const changePercentStr = $(tds[3]).text().trim().replace('%', '');
-        const priceStr = $(tds[4]).text().trim().replace('$', '').replace(',', '');
-        const volumeStr = tds.length > 5 ? $(tds[5]).text().trim() : '0';
-        const marketCapStr = tds.length > 6 ? $(tds[6]).text().trim() : '0';
-
-        const changePercent = parseFloat(changePercentStr) || 0;
-        const price = parseFloat(priceStr) || 0;
-        const volumeRaw = parseVolumeString(volumeStr);
-        const marketCap = parseVolumeString(marketCapStr);
-
-        if (symbol && symbol.match(/^[A-Z]+$/)) {
-          stocks.push({
-            symbol,
-            name,
-            price: price.toFixed(2),
-            change: '0.00',
-            changePercent: changePercent.toFixed(2),
-            volume: formatVolume(volumeRaw),
-            volumeRaw,
-            gap: changePercent.toFixed(2),
-            float: formatFloat(marketCap / 10), // Rough estimate
-            floatRaw: marketCap / 10,
-            rvol: '1.00',
-            high: price.toFixed(2),
-            low: price.toFixed(2),
-            open: price.toFixed(2),
-            prevClose: '0.00',
-            avgVolume: 0,
-            marketCap
-          });
-        }
-      }
-    });
-
-    console.log(`Scraped ${stocks.length} premarket gainers`);
-    if (stocks.length > 0) {
-      console.log(`Top gainers: ${stocks.slice(0, 3).map(s => `${s.symbol}(${s.changePercent}%)`).join(', ')}`);
-    }
-    return stocks.slice(0, 50);
-  } catch (error) {
-    console.error('Error scraping premarket gainers:', error.message);
-    return [];
-  }
-}
-
-// Scrape pre-market losers from stockanalysis.com
-async function scrapePremarketLosers() {
-  try {
-    const url = 'https://stockanalysis.com/markets/premarket/losers/';
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      }
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const stocks = [];
-
-    $('tbody tr').each((index, row) => {
-      const tds = $(row).find('td');
-      if (tds.length >= 5) {
-        const symbol = $(tds[1]).text().trim();
-        const name = $(tds[2]).text().trim();
-        const changePercentStr = $(tds[3]).text().trim().replace('%', '');
-        const priceStr = $(tds[4]).text().trim().replace('$', '').replace(',', '');
-        const volumeStr = tds.length > 5 ? $(tds[5]).text().trim() : '0';
-        const marketCapStr = tds.length > 6 ? $(tds[6]).text().trim() : '0';
-
-        const changePercent = parseFloat(changePercentStr) || 0;
-        const price = parseFloat(priceStr) || 0;
-        const volumeRaw = parseVolumeString(volumeStr);
-        const marketCap = parseVolumeString(marketCapStr);
-
-        if (symbol && symbol.match(/^[A-Z]+$/)) {
-          stocks.push({
-            symbol,
-            name,
-            price: price.toFixed(2),
-            change: '0.00',
-            changePercent: changePercent.toFixed(2),
-            volume: formatVolume(volumeRaw),
-            volumeRaw,
-            gap: changePercent.toFixed(2),
-            float: formatFloat(marketCap / 10),
-            floatRaw: marketCap / 10,
-            rvol: '1.00',
-            high: price.toFixed(2),
-            low: price.toFixed(2),
-            open: price.toFixed(2),
-            prevClose: '0.00',
-            avgVolume: 0,
-            marketCap
-          });
-        }
-      }
-    });
-
-    console.log(`Scraped ${stocks.length} premarket losers`);
-    return stocks.slice(0, 50);
-  } catch (error) {
-    console.error('Error scraping premarket losers:', error.message);
-    return [];
-  }
-}
-
-// Scrape most active from stockanalysis.com
-async function scrapePremarketActive() {
-  try {
-    const url = 'https://stockanalysis.com/markets/premarket/most-active/';
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      }
-    });
-
-    if (!response.ok) return [];
-
-    const html = await response.text();
-    const $ = cheerio.load(html);
-    const stocks = [];
-
-    $('tbody tr').each((index, row) => {
-      const tds = $(row).find('td');
-      if (tds.length >= 5) {
-        const symbol = $(tds[1]).text().trim();
-        const name = $(tds[2]).text().trim();
-        const changePercentStr = $(tds[3]).text().trim().replace('%', '');
-        const priceStr = $(tds[4]).text().trim().replace('$', '').replace(',', '');
-        const volumeStr = tds.length > 5 ? $(tds[5]).text().trim() : '0';
-        const marketCapStr = tds.length > 6 ? $(tds[6]).text().trim() : '0';
-
-        const changePercent = parseFloat(changePercentStr) || 0;
-        const price = parseFloat(priceStr) || 0;
-        const volumeRaw = parseVolumeString(volumeStr);
-        const marketCap = parseVolumeString(marketCapStr);
-
-        if (symbol && symbol.match(/^[A-Z]+$/)) {
-          stocks.push({
-            symbol,
-            name,
-            price: price.toFixed(2),
-            change: '0.00',
-            changePercent: changePercent.toFixed(2),
-            volume: formatVolume(volumeRaw),
-            volumeRaw,
-            gap: changePercent.toFixed(2),
-            float: formatFloat(marketCap / 10),
-            floatRaw: marketCap / 10,
-            rvol: '1.00',
-            high: price.toFixed(2),
-            low: price.toFixed(2),
-            open: price.toFixed(2),
-            prevClose: '0.00',
-            avgVolume: 0,
-            marketCap
-          });
-        }
-      }
-    });
-
-    console.log(`Scraped ${stocks.length} premarket active`);
-    return stocks.slice(0, 50);
-  } catch (error) {
-    console.error('Error scraping premarket active:', error.message);
-    return [];
-  }
-}
-
-// Fetch Yahoo screener for regular market hours
-async function fetchYahooScreener(scrId, count = 50) {
-  try {
-    const url = `https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved?scrIds=${scrId}&count=${count}`;
-    const response = await fetch(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      }
-    });
-
-    if (!response.ok) return [];
-
-    const data = await response.json();
-    const quotes = data?.finance?.result?.[0]?.quotes || [];
-    return quotes.map(transformYahooStock);
-  } catch (error) {
-    console.error(`Error fetching ${scrId}:`, error.message);
-    return [];
-  }
-}
-
-function transformYahooStock(quote) {
-  const price = quote.regularMarketPrice || 0;
-  const change = quote.regularMarketChange || 0;
-  const changePercent = quote.regularMarketChangePercent || 0;
-  const volume = quote.regularMarketVolume || 0;
-  const prevClose = quote.regularMarketPreviousClose || price - change;
-  const dayHigh = quote.regularMarketDayHigh || price;
-  const dayLow = quote.regularMarketDayLow || price;
-  const open = quote.regularMarketOpen || prevClose;
-  const avgVolume = quote.averageDailyVolume3Month || volume;
-  const sharesFloat = quote.floatShares || quote.sharesOutstanding || 0;
-  const gap = prevClose > 0 ? ((open - prevClose) / prevClose * 100) : 0;
-  const rvol = avgVolume > 0 ? (volume / avgVolume) : 1;
-
-  return {
-    symbol: quote.symbol,
-    name: quote.shortName || quote.longName || quote.symbol,
-    price: price.toFixed(2),
-    change: change.toFixed(2),
-    changePercent: changePercent.toFixed(2),
-    volume: formatVolume(volume),
-    volumeRaw: volume,
-    gap: gap.toFixed(2),
-    float: formatFloat(sharesFloat),
-    floatRaw: sharesFloat,
-    rvol: rvol.toFixed(2),
-    high: dayHigh.toFixed(2),
-    low: dayLow.toFixed(2),
-    open: open.toFixed(2),
-    prevClose: prevClose.toFixed(2),
-    avgVolume: avgVolume,
-    marketCap: quote.marketCap || 0
+const path = require('path');
+const { randomUUID } = require('crypto');
+const { createSafeFetch } = require('./safe-fetch');
+const { getMarketInfo } = require('./market-calendar');
+const { createUSProvider } = require('./market-us');
+const { fetchChinaSnapshot, fetchChinaQuotes } = require('./market-cn');
+const { deriveScanners } = require('./scanner-filters');
+const { createStrategyEngine } = require('./strategy');
+const { cnMetadata } = require('./strategy');
+const { createPositionStore } = require('./positions');
+http.setGlobalProxyFromEnv?.();
+const MARKETS = new Set(['US', 'CN']);
+const CATEGORIES = new Set(['gainers', 'losers', 'mostActive', 'premarket', 'afterhours',
+  'fivePillars', 'strictFivePillars', 'docPick', 'docPickStrict', 'hodMomentum', 'gapScanner', 'cnWatch']);
+const CN_CATEGORIES = new Set(['gainers', 'losers', 'mostActive', 'hodMomentum', 'gapScanner', 'cnWatch']);
+const emptyCache = () => ({ gainers: [], losers: [], mostActive: [], premarket: [], afterhours: [],
+  strategyPool: { limited: true, rows: [] }, quotes: {} });
+const validSymbol = (s, market) => market === 'CN' ? /^\d{6}$/.test(s) : /^[A-Z0-9][A-Z0-9.^=-]{0,19}$/.test(s);
+// 某榜失败会保留旧快照。合并时必须择最新报价，不能靠榜单排列顺序覆盖。
+function mergeQuotesLatest(lists, { session, market = 'US', tradingDate } = {}) {
+  const result = new Map();
+  // 一次合并复用日期格式器和每条报价的结果，避免逐类别先播时反复创建Intl实例。
+  const times = new Map(), priorities = new Map();
+  const dateFormatter = session ? new Intl.DateTimeFormat('en-CA', {
+    timeZone: market === 'CN' ? 'Asia/Shanghai' : 'America/New_York',
+    year: 'numeric', month: '2-digit', day: '2-digit'
+  }) : null;
+  const time = q => {
+    if (!times.has(q)) times.set(q, Date.parse(q?.quoteTime || q?.sourceDate || '') || 0);
+    return times.get(q);
   };
-}
-
-function formatVolume(vol) {
-  if (vol >= 1000000000) return (vol / 1000000000).toFixed(1) + 'B';
-  if (vol >= 1000000) return (vol / 1000000).toFixed(1) + 'M';
-  if (vol >= 1000) return (vol / 1000).toFixed(0) + 'K';
-  return vol.toString();
-}
-
-function formatFloat(floatShares) {
-  if (!floatShares || floatShares === 0) return 'N/A';
-  if (floatShares >= 1000000000) return (floatShares / 1000000000).toFixed(1) + 'B';
-  if (floatShares >= 1000000) return (floatShares / 1000000).toFixed(1) + 'M';
-  if (floatShares >= 1000) return (floatShares / 1000).toFixed(0) + 'K';
-  return floatShares.toString();
-}
-
-// Scanner Filters
-function apply5PillarsFilter(stocks) {
-  return stocks.filter(s => {
-    const price = parseFloat(s.price);
-    const change = Math.abs(parseFloat(s.changePercent));
-    const priceOk = price >= 1 && price <= 20;
-    const changeOk = change >= 10;
-    return priceOk && changeOk;
-  }).sort((a, b) => Math.abs(parseFloat(b.changePercent)) - Math.abs(parseFloat(a.changePercent)));
-}
-
-function applyHODFilter(stocks) {
-  return stocks.filter(s => {
-    const change = parseFloat(s.changePercent);
-    return change >= 5;
-  }).sort((a, b) => parseFloat(b.changePercent) - parseFloat(a.changePercent));
-}
-
-function applyGapFilter(stocks) {
-  return stocks.filter(s => {
-    const gap = Math.abs(parseFloat(s.gap) || parseFloat(s.changePercent));
-    return gap >= 4;
-  }).sort((a, b) => Math.abs(parseFloat(b.gap) || parseFloat(b.changePercent)) - Math.abs(parseFloat(a.gap) || parseFloat(a.changePercent)));
-}
-
-// Main refresh function
-async function refreshData() {
-  const session = getMarketSession();
-  const etTime = getETTime();
-  console.log(`[${new Date().toISOString()}] Refreshing... Session: ${session} (ET: ${etTime})`);
-
-  try {
-    let gainers, losers, mostActive;
-
-    if (session === 'premarket') {
-      // During premarket, scrape stockanalysis.com for real premarket data
-      console.log('Fetching PREMARKET data from stockanalysis.com...');
-      [gainers, losers, mostActive] = await Promise.all([
-        scrapePremarketGainers(),
-        scrapePremarketLosers(),
-        scrapePremarketActive()
-      ]);
-    } else if (session === 'regular') {
-      // During regular hours, use Yahoo Finance
-      console.log('Fetching REGULAR session data from Yahoo Finance...');
-      const [gainersData, losersData, activeData] = await Promise.all([
-        fetchYahooScreener('day_gainers', 50),
-        fetchYahooScreener('day_losers', 50),
-        fetchYahooScreener('most_actives', 50)
-      ]);
-      gainers = gainersData;
-      losers = losersData;
-      mostActive = activeData;
-    } else {
-      // After hours or closed - try premarket data
-      console.log('Fetching AFTERHOURS/CLOSED data...');
-      [gainers, losers, mostActive] = await Promise.all([
-        scrapePremarketGainers(),
-        scrapePremarketLosers(),
-        scrapePremarketActive()
-      ]);
+  const priority = q => {
+    if (!session) return 0;
+    if (!priorities.has(q)) {
+      const sourceTime = Date.parse(q.quoteTime);
+      const date = q.quoteTime ? Number.isFinite(sourceTime) ? dateFormatter.format(new Date(sourceTime)) : null : q.sourceDate;
+      priorities.set(q, q.quoteSession === session && date === tradingDate ? 1 : 0);
     }
-
-    // Format data for display
-    const formattedGainers = gainers.map(s => ({
-      ...s,
-      price: typeof s.price === 'number' ? s.price.toFixed(2) : s.price,
-      changePercent: typeof s.changePercent === 'number' ? s.changePercent.toFixed(2) : s.changePercent
-    }));
-
-    const formattedLosers = losers.map(s => ({
-      ...s,
-      price: typeof s.price === 'number' ? s.price.toFixed(2) : s.price,
-      changePercent: typeof s.changePercent === 'number' ? s.changePercent.toFixed(2) : s.changePercent
-    }));
-
-    // Apply scanner filters
-    const fivePillars = apply5PillarsFilter(formattedGainers);
-    const hodMomentum = applyHODFilter(formattedGainers);
-    const gapScanner = applyGapFilter(formattedGainers);
-
-    // Update cache
-    stockCache = {
-      gainers: formattedGainers,
-      losers: formattedLosers,
-      mostActive: mostActive,
-      premarket: session === 'premarket' ? formattedGainers : stockCache.premarket,
-      afterhours: session === 'afterhours' ? formattedGainers : stockCache.afterhours,
-      fivePillars,
-      hodMomentum,
-      gapScanner
-    };
-
-    lastUpdateTime = new Date().toISOString();
-
-    console.log(`Updated: ${formattedGainers.length} gainers, ${formattedLosers.length} losers, ${mostActive.length} active`);
-    console.log(`Filters: ${fivePillars.length} 5-pillars, ${hodMomentum.length} HOD, ${gapScanner.length} gap`);
-    if (formattedGainers.length > 0) {
-      console.log(`Top 3: ${formattedGainers.slice(0, 3).map(s => `${s.symbol}(${s.changePercent}%)`).join(', ')}`);
-    }
-
-    broadcastUpdate();
-  } catch (error) {
-    console.error('Error refreshing data:', error.message);
+    return priorities.get(q);
+  };
+  for (const q of lists.flat()) {
+    if (!q?.symbol) continue;
+    const previous = result.get(q.symbol);
+    if (!previous || priority(q) > priority(previous) ||
+      (priority(q) === priority(previous) && time(q) >= time(previous))) result.set(q.symbol, q);
   }
+  return result;
 }
 
-function broadcastUpdate() {
-  const session = getMarketSession();
-  const message = JSON.stringify({
-    type: 'update',
-    data: stockCache,
-    session: session,
-    lastUpdateTime,
-    etTime: getETTime(),
-    timestamp: new Date().toISOString()
+function createScannerServer(options = {}) {
+  const now = options.now || Date.now;
+  const info = (market, at = now()) => getMarketInfo(market, new Date(at));
+  const safeFetch = options.safeFetch || createSafeFetch();
+  const us = options.usProvider || createUSProvider(safeFetch);
+  const cnSnapshot = options.cnSnapshot || (signal => fetchChinaSnapshot(safeFetch, signal));
+  const cnQuotes = options.cnQuotes || ((symbols, signal) => fetchChinaQuotes(safeFetch, symbols, signal));
+  const engine = options.engine || createStrategyEngine({ getMarketInfo: info });
+  const store = options.store || createPositionStore({
+    filePath: options.statePath || process.env.STATE_FILE || path.join(__dirname, 'data', 'positions.json'),
+    getMarketInfo: info
   });
-
-  let clientCount = 0;
-  wss.clients.forEach(client => {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(message);
-      clientCount++;
-    }
-  });
-
-  if (clientCount > 0) {
-    console.log(`Broadcast to ${clientCount} clients`);
+  const instanceId = randomUUID();
+  const revisions = { US: 0, CN: 0 };
+  const state = Object.fromEntries([...MARKETS].map(m => [m, {
+    cache: emptyCache(), lastUpdate: null, error: null, quoteError: null, refreshing: false,
+    source: m === 'CN' ? '东方财富' : '雅虎财经', categories: {}, scope: null
+  }]));
+  const watched = { US: new Map(), CN: new Map() };
+  const allowedOrigins = new Set((options.allowedOrigins || process.env.ALLOWED_ORIGIN ||
+    'http://localhost:5173,http://127.0.0.1:5173,http://localhost:4173,http://127.0.0.1:4173').split(',').map(s => s.trim()).filter(Boolean));
+  const app = express();
+  app.set('query parser', 'simple');
+  app.use(cors({ origin: [...allowedOrigins] }));
+  app.use(express.json({ limit: '256kb' }));
+  // 本机网页仍需 Origin 约束；非浏览器本机请求允许无 Origin。
+  app.use((req, res, next) => req.headers.origin && !allowedOrigins.has(req.headers.origin)
+    ? res.status(403).json({ error: 'Origin not allowed' }) : next());
+  const server = http.createServer(app);
+  const wss = new WebSocketServer({ server, maxPayload: 1024 * 1024 });
+  const getMarket = req => {
+    const market = req.query.market || req.body?.market || 'US';
+    if (!MARKETS.has(market)) throw Object.assign(new Error('Unknown market'), { status: 400 });
+    return market;
+  };
+  function snapshot(market, type = 'update') {
+    const s = state[market];
+    const meta = info(market);
+    const all = [s.cache.gainers, s.cache.losers, s.cache.mostActive, Object.values(s.cache.quotes || {})].flat();
+    const quoteTimes = all.map(q => q?.quoteTime).filter(Boolean).sort();
+    const quoteTime = quoteTimes.at(-1) || null;
+    const sourceDate = all.map(q => q?.sourceDate).filter(Boolean).sort().at(-1) || null;
+    return { type, market, instanceId, positionsDurable: true, positionsRevision: revisions[market],
+      data: { ...s.cache, positions: store.list(market) }, session: meta.session,
+      lastUpdateTime: s.lastUpdate, quoteTime,
+      dataDate: quoteTime ? new Date(quoteTime).toLocaleDateString('en-CA', { timeZone: meta.timeZone || (market === 'CN' ? 'Asia/Shanghai' : 'America/New_York') }) : sourceDate,
+      tradingDate: meta.date, marketTime: meta.marketTime, marketMinutes: meta.minutes, marketDay: meta.day,
+      timeZone: meta.timeZone, dataSource: s.source, dataError: [s.error, s.quoteError].filter(Boolean).join('；') || null,
+      calendarKnown: meta.calendarKnown, categoryStatus: s.categories, scope: s.scope,
+      ...(market === 'US' ? { etTime: meta.marketTime, etMinutes: meta.minutes, etDay: meta.day } : {}),
+      timestamp: new Date(now()).toISOString() };
   }
-}
+  function send(client, message) {
+    if (client.readyState !== WebSocket.OPEN) return;
+    try { client.send(message, error => { if (error) client.terminate(); }); }
+    catch { client.terminate(); }
+  }
+  function broadcast(market) {
+    const message = JSON.stringify(snapshot(market));
+    for (const client of wss.clients) if (client.market === market) send(client, message);
+  }
+  function pool(market, quotes, scanners, gainers, session) {
+    const wanted = new Map();
+    const candidates = market === 'CN' ? scanners.cnWatch || [] : [...(scanners.docPickStrict || []), ...(scanners.docPick || [])];
+    for (const q of candidates) wanted.set(q.symbol, market === 'CN' || session !== 'regular');
+    const limited = wanted.size === 0 || session !== 'regular';
+    if (limited && market === 'US') for (const q of gainers.slice(0, 10)) wanted.set(q.symbol, true);
+    const order = { trigger: 0, based: 1, pullback: 2, rally: 3, watch: 4, stale: 5 };
+    const rows = [];
+    for (const [symbol, watchOnly] of wanted) {
+      const q = quotes.get(symbol);
+      if (!q) continue;
+      const analysis = session === 'regular' ? engine.analyze(symbol, market, now()) : null;
+      rows.push({ ...q, ...(market === 'CN' ? cnMetadata(q) : {}), dayHigh: q.high, ...analysis, state: analysis?.state || 'watch',
+        watchOnly, held: store.positions.has(`${market}:${symbol}`) });
+    }
+    rows.sort((a, b) => (order[a.state] ?? 9) - (order[b.state] ?? 9) || Number(b.changePercent) - Number(a.changePercent));
+    return { limited, rows: rows.slice(0, 30), market, observationOnly: market === 'CN' };
+  }
 
-wss.on('connection', (ws) => {
-  console.log('Client connected');
-  const session = getMarketSession();
+  // 展示榜单不必等待独立持仓报价或float补全。此阶段不运行策略、不修改权威持仓。
+  function publishRankings(market, meta) {
+    const s = state[market];
+    const lists = [s.cache.gainers, s.cache.losers, s.cache.mostActive];
+    const all = [...mergeQuotesLatest(lists, {
+      market, session: meta.session, tradingDate: meta.lastTradingDate || meta.date
+    }).values()];
+    s.cache = { ...s.cache, ...deriveScanners(all, market) };
+    if (market === 'US') {
+      s.scope = { kind: 'ranked-sample', perRanking: 200, label: '榜单合并样本',
+        description: meta.session === 'afterhours' ? '盘后涨跌榜合并样本；无可靠盘后成交活跃榜。页面报价缺少精确时间，买点仅观察。' :
+          '三类榜单各最多 200 只；来源可能返回更少，筛选不代表全市场。' };
+      if (meta.session === 'premarket') s.cache.premarket = s.cache.gainers;
+      if (meta.session === 'afterhours') s.cache.afterhours = s.cache.gainers;
+    }
+    s.scope = { ...s.scope, sampleSize: all.length };
+    const sources = [...new Set(lists.flat().map(q => q.dataSource).filter(Boolean))];
+    if (sources.length) s.source = sources.join(' / ') + (sources.length > 1 ? '（含保留数据）' : '');
+    broadcast(market);
+  }
 
-  ws.send(JSON.stringify({
-    type: 'initial',
-    data: stockCache,
-    session: session,
-    lastUpdateTime,
-    etTime: getETTime(),
-    timestamp: new Date().toISOString()
+  async function refresh(market) {
+    const s = state[market];
+    if (s.refreshing) return;
+    s.refreshing = true;
+    const meta = info(market);
+    const roundSignal = AbortSignal.timeout(12000);
+    try {
+      for (const [symbol, expiry] of watched[market]) if (expiry < now()) watched[market].delete(symbol);
+      const tracked = [...new Set([...store.list(market).map(p => p.symbol), ...watched[market].keys()])];
+      const quotePromise = market === 'CN' ? cnQuotes(tracked, roundSignal) : us.fetchQuotes(tracked, meta.session, roundSignal);
+      // 报价任务独立于排行榜；榜单失败不阻断持仓监控。
+      const categories = ['gainers', 'losers', 'mostActive'];
+      let categoriesFinished = 0;
+      const rankingSession = ['premarket', 'afterhours'].includes(meta.session) ? meta.session : 'regular';
+      const rankingPromise = market === 'CN' ? cnSnapshot(roundSignal).then(snapshot => {
+        // CN仍按完整三榜原子成功，避免改变任何一榜失败时保留完整旧快照的语义。
+        s.cache = { ...s.cache, ...snapshot };
+        s.scope = snapshot.scope;
+        s.lastUpdate = new Date(now()).toISOString();
+        for (const category of categories) s.categories[category] = { lastSuccess: s.lastUpdate, error: null };
+        s.error = null;
+        publishRankings(market, meta);
+        return snapshot;
+      }) : Promise.allSettled(categories.map(async category => {
+        try {
+          const rows = await us.fetchRanking(category, rankingSession, roundSignal);
+          s.cache[category] = rows;
+          s.categories[category] = { lastSuccess: new Date(now()).toISOString(), error: null, session: rankingSession };
+          categoriesFinished++;
+          s.error = categories.map(name => s.categories[name]?.error).filter(Boolean).join('；') || null;
+          if (categoriesFinished === categories.length && !s.error) s.lastUpdate = new Date(now()).toISOString();
+          publishRankings(market, meta);
+          return rows;
+        } catch (error) {
+          categoriesFinished++;
+          const message = `${category} 行情获取失败，保留上次成功数据`;
+          s.categories[category] = { ...s.categories[category], error: message };
+          s.error = categories.map(name => s.categories[name]?.error).filter(Boolean).join('；') || null;
+          throw error;
+        }
+      }));
+      const [rankings, quotes] = await Promise.allSettled([rankingPromise, quotePromise]);
+      const errors = [];
+      if (market === 'CN') {
+        if (rankings.status === 'rejected') errors.push('A 股榜单暂时无法刷新，保留上次成功数据');
+      } else if (rankings.status === 'fulfilled') {
+        rankings.value.forEach((result, i) => {
+          const category = categories[i];
+          if (result.status === 'rejected') errors.push(s.categories[category].error);
+        });
+      } else errors.push('美股榜单暂时无法刷新，保留上次成功数据');
+      s.error = errors.join('；') || null;
+      const independent = quotes.status === 'fulfilled' ? quotes.value : [];
+      const missing = tracked.filter(symbol => !independent.some(q => q.symbol === symbol && q.quoteTime));
+      s.quoteError = missing.length ? `独立报价暂缺：${missing.slice(0, 5).join('、')}，持仓将显示报价状态` : null;
+      const displayOptions = { market, session: meta.session, tradingDate: meta.lastTradingDate || meta.date };
+      const rankingLists = [s.cache.gainers, s.cache.losers, s.cache.mostActive];
+      const all = [...mergeQuotesLatest(rankingLists, displayOptions).values()];
+      if (market === 'US' && meta.session === 'regular' && !s.error) {
+        await us.enrichFloats(all, AbortSignal.any([roundSignal, AbortSignal.timeout(2500)]));
+      }
+      s.cache.quotes = Object.fromEntries(mergeQuotesLatest([Object.values(s.cache.quotes), independent]));
+      for (const symbol of Object.keys(s.cache.quotes)) if (!tracked.includes(symbol)) delete s.cache.quotes[symbol];
+      // 展示可采用日期明确的盘后页，策略仅消费独立的真实时间戳报价。
+      engine.feed([...rankingLists.flat(), ...independent], market, now());
+      engine.updatePositions(store.positions, market, now());
+      engine.prune(now());
+      store.save();
+      revisions[market]++;
+      const scanners = deriveScanners(all, market);
+      const quoteMap = mergeQuotesLatest([all, independent], displayOptions);
+      s.cache = { ...s.cache, ...scanners, strategyPool: pool(market, quoteMap, scanners, s.cache.gainers, meta.session) };
+      if (meta.session === 'premarket') s.cache.premarket = s.cache.gainers;
+      if (meta.session === 'afterhours') s.cache.afterhours = s.cache.gainers;
+      s.scope = { ...s.scope, sampleSize: all.length };
+      const sources = [...new Set(rankingLists.flat().map(q => q.dataSource).filter(Boolean))];
+      if (sources.length) s.source = sources.join(' / ') + (sources.length > 1 ? '（含保留数据）' : '');
+    } catch (error) {
+      s.error = `行情更新暂时失败：${error.message}，保留上次成功数据`;
+    } finally { s.refreshing = false; broadcast(market); }
+  }
+  wss.on('error', error => console.error('WebSocket 服务错误:', error.message));
+  wss.on('connection', (ws, req) => {
+    ws.on('error', () => ws.terminate());
+    if (req.headers.origin && !allowedOrigins.has(req.headers.origin)) return ws.close(1008, 'Origin not allowed');
+    const market = new URL(req.url, 'http://localhost').searchParams.get('market') || 'US';
+    if (!MARKETS.has(market)) return ws.close(1008, 'Unknown market');
+    ws.market = market;
+    send(ws, JSON.stringify(snapshot(market, 'initial')));
+  });
+  const wrap = handler => (req, res, next) => { try { Promise.resolve(handler(req, res)).catch(next); } catch (error) { next(error); } };
+  const positionResponse = market => ({ ok: true, market, instanceId, positionsDurable: true,
+    migrationNeeded: !store.hasState(market), positionsRevision: revisions[market], data: store.list(market) });
+  app.get('/api/health', wrap((req, res) => {
+    const market = getMarket(req); const message = snapshot(market);
+    res.json({ status: 'ok', service: 'ross-cameron-stock-scanner',
+      launchId: options.launchId || process.env.SCANNER_LAUNCH_ID || null, instanceId,
+      market, session: message.session, marketTime: message.marketTime,
+      dataSource: message.dataSource, dataError: message.dataError, quoteTime: message.quoteTime,
+      calendarKnown: message.calendarKnown, lastUpdate: message.lastUpdateTime,
+      gainersCount: message.data.gainers.length, timestamp: message.timestamp });
   }));
-
-  ws.on('close', () => console.log('Client disconnected'));
-});
-
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    session: getMarketSession(),
-    etTime: getETTime(),
-    lastUpdate: lastUpdateTime,
-    gainersCount: stockCache.gainers.length,
-    timestamp: new Date().toISOString()
+  app.get('/api/scanner/:category', wrap((req, res) => {
+    const market = getMarket(req);
+    if (!(market === 'CN' ? CN_CATEGORIES : CATEGORIES).has(req.params.category) ||
+      (market === 'US' && req.params.category === 'cnWatch')) return res.status(404).json({ error: 'Unknown category' });
+    const message = snapshot(market);
+    res.json({ ...message, data: message.data[req.params.category] || [] });
+  }));
+  app.post('/api/watch', wrap((req, res) => {
+    const market = getMarket(req); const symbol = String(req.body.symbol || '').toUpperCase();
+    if (!validSymbol(symbol, market)) return res.status(400).json({ error: '股票代码格式无效' });
+    if (watched[market].size >= 100 && !watched[market].has(symbol)) return res.status(429).json({ error: '观察股票过多' });
+    watched[market].set(symbol, now() + 30 * 60 * 1000);
+    res.json({ ok: true });
+  }));
+  app.get('/api/positions', wrap((req, res) => res.json(positionResponse(getMarket(req)))));
+  app.get('/api/trades', wrap((req, res) => {
+    const market = getMarket(req);
+    res.json({ data: store.trades ? store.trades(market) : [] });
+  }));
+  app.post('/api/positions', wrap((req, res) => {
+    const market = getMarket(req);
+    store.upsert(req.body, market, { now: now() });
+    revisions[market]++;
+    res.json(positionResponse(market)); broadcast(market);
+  }));
+  app.post('/api/positions/sync', wrap((req, res) => {
+    const market = getMarket(req);
+    if (!Array.isArray(req.body.positions)) return res.status(400).json({ error: 'positions 必须为数组' });
+    // 只迁移从未持久化的市场，空仓同样有权威状态，不能恢复已平仓旧镜像。
+    if (!store.hasState(market)) { store.restore(req.body.positions, market, { now: now() }); revisions[market]++; }
+    res.json(positionResponse(market)); broadcast(market);
+  }));
+  app.delete('/api/positions/:symbol', wrap((req, res) => {
+    const market = getMarket(req);
+    const result = store.close(req.params.symbol.toUpperCase(), market, {
+      operationId: req.body?.operationId || req.headers['idempotency-key'] || req.query.operationId,
+      now: now(), session: info(market).session
+    });
+    revisions[market]++;
+    res.json({ ...positionResponse(market), ...result, data: store.list(market) }); broadcast(market);
+  }));
+  app.use((error, req, res, next) => {
+    if (res.headersSent) return next(error);
+    res.status(error.status || 500).json({ error: error.status ? error.message : '服务处理失败，请重试' });
+    if (!error.status) console.error(error);
   });
-});
-
-app.get('/api/scanner/:category', (req, res) => {
-  const { category } = req.params;
-  res.json({
-    data: stockCache[category] || [],
-    session: getMarketSession(),
-    etTime: getETTime(),
-    timestamp: new Date().toISOString()
-  });
-});
-
-server.listen(PORT, () => {
-  const session = getMarketSession();
-  const etTime = getETTime();
-  console.log(`
-╔═══════════════════════════════════════════════════════════╗
-║     Ross Cameron Stock Scanner - Backend                  ║
-║     Pre-Market: stockanalysis.com | Regular: Yahoo        ║
-╠═══════════════════════════════════════════════════════════╣
-║  Server: http://localhost:${PORT}                            ║
-║  WebSocket: ws://localhost:${PORT}                           ║
-║  Session: ${session.padEnd(12)} ET Time: ${etTime}        ║
-╚═══════════════════════════════════════════════════════════╝
-  `);
-
-  refreshData();
-  setInterval(refreshData, 15000); // Refresh every 15 seconds
-});
+  const intervals = [];
+  function start(port = Number(process.env.PORT || 3001), host = process.env.HOST || '127.0.0.1') {
+    if (!['127.0.0.1', 'localhost', '::1'].includes(host)) throw new Error('服务仅允许绑定本机回环地址');
+    return new Promise((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, host, () => {
+        server.removeListener('error', reject);
+        if (options.poll !== false) {
+          for (const market of MARKETS) {
+            refresh(market);
+            intervals.push(setInterval(() => refresh(market), 15000));
+          }
+        }
+        resolve(server.address());
+      });
+    });
+  }
+  async function stop() {
+    intervals.forEach(clearInterval);
+    for (const client of wss.clients) client.terminate();
+    await new Promise(resolve => wss.close(resolve));
+    await new Promise(resolve => server.close(resolve));
+  }
+  return { app, server, wss, start, stop, refresh, snapshot, state, store, engine };
+}
+if (require.main === module) {
+  const scanner = createScannerServer();
+  scanner.start().then(address => console.log(`股票扫描器启动 http://${address.address}:${address.port}`))
+    .catch(error => { console.error(error.message); process.exitCode = 1; });
+}
+module.exports = { createScannerServer, mergeQuotesLatest };
