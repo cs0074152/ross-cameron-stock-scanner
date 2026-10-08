@@ -497,6 +497,24 @@ code,pre{
   font-size:17px}
 .faq{
   padding-top:0}
+.disclaimer-section{
+  padding-top:0}
+.disclaimer-card{
+  background:white;
+  border:1px solid var(--line);
+  border-left:4px solid var(--accent);
+  border-radius:16px;
+  padding:28px;
+  font-size:14px;
+  line-height:1.9}
+.disclaimer-card p{
+  margin:0 0 16px;
+  color:var(--muted)}
+.disclaimer-card strong{
+  color:var(--ink)}
+.disclaimer-card a{
+  color:var(--accent);
+  text-decoration:underline}
 .faq details{
   border-top:1px solid var(--line);
   padding:21px 0}
@@ -554,6 +572,7 @@ code,pre{
   margin-bottom:26px}
 .footer-top>div{
   display:flex;
+  flex-wrap:wrap;
   gap:23px;
   font-size:12px}
 .site-footer p{

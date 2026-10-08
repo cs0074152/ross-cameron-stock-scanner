@@ -67,6 +67,14 @@ bash start.sh</code></pre><button class="copy-button" data-copy="unix" aria-labe
   </div>
 </div></section>
 <section class="section wrap boundaries"><div class="section-heading"><p class="eyebrow">数据说明</p><h2>清楚知道，工具提供了什么。</h2></div><div class="boundary-grid"><article><h3>公开行情，有来源也有延迟</h3><p>美股使用 Yahoo Finance 与 StockAnalysis，A 股使用东方财富；图表由 TradingView 加载。公开接口可能延迟、限流或变化，连接成功不等于报价已经更新。</p></article><article><h3>数值观察，保留人工核实</h3><p>榜单是样本，不覆盖全市场。快照不是完整 K 线，也不包含 Level 2、逐笔成交或新闻验证。未知和过期指标不会被自动当作有效值。</p></article><article><h3>本机记账，保持明确边界</h3><p>持仓与收据保存到本机，不进入 Git 仓库。所有登记与平仓均为模拟，不连接券商；GitHub Pages 仅承载这份介绍，不运行行情后台。</p></article></div></section>
+<section id="disclaimer" class="section wrap disclaimer-section" aria-labelledby="disclaimer-title"><div class="disclaimer-card">
+  <p class="eyebrow">使用风险与责任</p><h2 id="disclaimer-title">免责声明</h2>
+  <p>本软件仅供学习、行情观察、策略研究和模拟复盘，不构成投资建议或收益承诺，不连接券商、不执行真实交易。实际投资或交易决定及其结果由使用者自行负责。</p>
+  <p>软件按“现状”和“可用状态”提供，不保证软件及第三方数据准确、完整、及时、可靠或持续可用；行情可能延迟、缺失或错误，模拟结果不代表真实成交或实际收益。</p>
+  <p><strong>因使用、无法使用本软件，或依赖其中的数据、图表、信号或模拟结果产生的任何直接或间接损失，包括投资或交易亏损、资金损失、利润损失、错失机会、数据丢失、系统故障及业务中断，在适用法律允许的最大范围内，均由使用者自行承担，作者、贡献者及维护者不承担责任，也不承担赔偿或补偿义务。</strong></p>
+  <p>请独立评估风险、核实行情并备份数据。本声明不排除或限制适用法律规定不得免除或限制的责任；如有冲突，以适用法律为准，不变更 MIT 许可的授权条件。</p>
+  <a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/DISCLAIMER.md">阅读完整免责声明 ↗</a>
+</div></section>
 <section class="section wrap faq"><div class="section-heading"><p class="eyebrow">常见问题</p><h2>开始之前，你可能想了解。</h2></div>
 <details><summary>需要申请 API Key 吗？</summary><p>当前实现不需要填写商业行情 API Key；公开行情来源可能有时效、访问频率和使用条款限制。</p></details>
 <details><summary>页面打开了，为什么没有新行情？</summary><p>查看连接状态、源错误和报价时间。休市、公开接口限流或网络不通可能导致等待；系统保留最后有效数据并说明状态。外部图表的加载速度也受网络影响。</p></details>
@@ -76,5 +84,5 @@ bash start.sh</code></pre><button class="copy-button" data-copy="unix" aria-labe
 </section>
 <section class="final-cta wrap"><div><p class="eyebrow">把观察过程记录下来</p><h2>从一个清晰的工作台开始。</h2></div><a class="button primary" href="https://github.com/cs0074152/ross-cameron-stock-scanner">前往 GitHub ↗</a></section>
 </main>
-<footer class="site-footer wrap"><div class="footer-top"><span class="brand">Scanner<span class="brand-light"> Desk</span></span><div><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/GUIDE.md">使用指南</a><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/issues">反馈建议</a><a href="https://github.com/Jayanth7416/ross-cameron-stock-scanner">原始项目</a></div></div><p>基于 Jayanth7416 的项目扩展，中文双市场版本由 cs0074152 维护。MIT · 非官方项目。</p><p>¹ 2026-10-08 Windows / Node 24 本机测量，已缓存构建的服务就绪指标，不含浏览器与外部图表加载。<a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/PERFORMANCE.md">查看方法</a></p><p>仅用于学习、行情观察与模拟复盘。图片和交互示例使用演示数据。</p></footer>
+<footer class="site-footer wrap"><div class="footer-top"><span class="brand">Scanner<span class="brand-light"> Desk</span></span><div><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/GUIDE.md">使用指南</a><a href="#disclaimer">免责声明</a><a href="https://github.com/cs0074152/ross-cameron-stock-scanner/issues">反馈建议</a><a href="https://github.com/Jayanth7416/ross-cameron-stock-scanner">原始项目</a></div></div><p>基于 Jayanth7416 的项目扩展，中文双市场版本由 cs0074152 维护。MIT · 非官方项目。</p><p>¹ 2026-10-08 Windows / Node 24 本机测量，已缓存构建的服务就绪指标，不含浏览器与外部图表加载。<a href="https://github.com/cs0074152/ross-cameron-stock-scanner/blob/main/docs/PERFORMANCE.md">查看方法</a></p><p>仅用于学习、行情观察与模拟复盘。图片和交互示例使用演示数据。使用风险及损失自担；作者在法律允许的范围内不承担相关责任。</p></footer>
 </body></html>
