@@ -707,7 +707,18 @@ function App() {
     {dataError && <div className="data-error" role="status">{dataError}</div>}{actionError && <div className="action-error" role="alert">{actionError}<button className="btn secondary" onClick={() => setActionError(null)}>关闭提示</button></div>}
     <MarketStats gainers={stocks.gainers || EMPTY_LIST} losers={stocks.losers || EMPTY_LIST} market={market} />
     {view === 'scanner' ? <main className="app-main"><div className="left-panel"><Scanner key={market} stocks={displayStocks} selectedSymbol={selectedSymbol} onSelectSymbol={selectSymbol} title={market === 'CN' ? 'A 股扫描器' : '美股扫描器'} scannerPreset={scannerPreset} onPresetChange={setScannerPreset} category={category} onCategoryChange={setCategory} session={session} dataDate={dataDate} history={priceHistory} market={market} dataError={dataError} lastUpdate={lastUpdate} scope={scope} now={clockTick} /></div><div className="right-panel"><TradingViewChart key={market} symbol={selectedSymbol} stock={selectedStock} market={market} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} theme={theme} /></div></main> : <main className="app-main"><Suspense fallback={<div className="empty-hint" role="status">正在加载策略与持仓页面…</div>}><StrategyView key={market} market={market} stocks={stocks} selectedStock={selectedStock} trade={trade} setTrade={setTrade} onMarkBuy={markPosition} onClosePosition={closePosition} onAdjustPosition={adjustPosition} pending={pending} historyDates={ledgers[market].sessions} scope={scope} calendarKnown={calendarKnown} session={session} etMeta={marketMeta} selectedSymbol={selectedSymbol} onOpenPreset={id => { setScannerPreset(id); setView('scanner'); }} /></Suspense></main>}
-    <footer className="app-footer"><div className="footer-info"><span>{market === 'CN' ? '成交量：股 | 流通股数：流通市值估算 | 量比：行情源口径 | 仅榜单样本' : '美股榜单样本 | 条件与数据来源见扫描器说明 | 新闻催化需人工确认'}</span></div><div className="footer-disclaimer">数据：{dataSource || '加载中'} | 图表：TradingView（行情时效独立）</div></footer>
+    <footer className="app-footer">
+      <div className="footer-meta"><div className="footer-info"><span>{market === 'CN' ? '成交量：股 | 流通股数：流通市值估算 | 量比：行情源口径 | 仅榜单样本' : '美股榜单样本 | 条件与数据来源见扫描器说明 | 新闻催化需人工确认'}</span></div><div className="footer-disclaimer">数据：{dataSource || '加载中'} | 图表：TradingView（行情时效独立）</div></div>
+      <details className="usage-disclaimer">
+        <summary>免责声明：使用风险及损失自担；作者在法律允许范围内免责。点击查看详情</summary>
+        <div className="disclaimer-body">
+          <p>本软件仅供学习、行情观察、策略研究和模拟复盘，不构成投资建议或收益承诺，不连接券商、不执行真实交易。任何实际投资或交易决定及其结果由使用者自行负责。</p>
+          <p>软件按“现状”和“可用状态”提供，不保证软件及第三方数据准确、完整、及时、可靠或持续可用。行情可能延迟、缺失或错误，模拟结果不代表真实成交或实际收益。</p>
+          <p><strong>因使用、无法使用本软件，或依赖其中的数据、图表、信号或模拟结果产生的任何直接或间接损失，包括投资或交易亏损、资金损失、利润损失、错失机会、数据丢失、系统故障及业务中断，在适用法律允许的最大范围内，均由使用者自行承担，作者、贡献者及维护者不承担责任，也不承担赔偿或补偿义务。</strong></p>
+          <p>请自行核实行情、独立评估风险并备份数据。本声明不排除或限制适用法律规定不得免除或限制的责任；如有冲突，以适用法律为准，不变更 MIT 许可的授权条件。</p>
+        </div>
+      </details>
+    </footer>
   </div>;
 }
 
