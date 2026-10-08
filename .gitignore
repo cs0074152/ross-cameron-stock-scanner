@@ -13,6 +13,8 @@ build/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.*
+!.env.example
 
 # Debug logs
 npm-debug.log*
@@ -39,3 +41,12 @@ coverage/
 
 # Misc
 *.log
+
+# Mimosa 安全扫描产物（工具生成，勿入库）
+.mimosa/
+
+# Server-owned positions and market-specific trade journal
+backend/data/
+
+# Local launcher instance, startup lock and diagnostics
+.runtime/
