@@ -3,7 +3,7 @@ function number(value) {
   return Number(value);
 }
 
-// 宽松观察池只有两个数值条件；新闻催化剂仍需人工核实。
+// 宽松观察池只有两个数值条件；独立新闻服务核查来源，不判断内容或催化作用。
 function apply5PillarsFilter(stocks) {
   return stocks.filter(s => number(s.price) >= 1 && number(s.price) <= 20 && Math.abs(number(s.changePercent)) >= 10)
     .sort((a, b) => Math.abs(number(b.changePercent)) - Math.abs(number(a.changePercent)));

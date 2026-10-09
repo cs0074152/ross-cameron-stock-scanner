@@ -55,6 +55,29 @@ async function fixture(t, overrides = {}) {
   return { scanner, request, controls, directory, url,
     advance: milliseconds => { clock += milliseconds; } };
 }
+test('新闻API复用市场/代码校验和严格refresh参数，限流返回Retry-After', async t => {
+  const calls = [];
+  const f = await fixture(t, { newsService: {
+    get: async (market, symbol, options) => { calls.push({ market, symbol, options }); if (symbol === 'BUSY') throw Object.assign(Error('busy'), { status: 429, retryAfter: 6 }); return { market, symbol, status: 'none', items: [] }; }, close() {}
+  } });
+  assert.equal((await f.request('/api/news/aapl?market=US&refresh=1')).status, 200);
+  assert.deepEqual(calls[0], { market: 'US', symbol: 'AAPL', options: { refresh: true } });
+  for (const route of ['/api/news/123?market=CN', '/api/news/AAPL?market=BAD', '/api/news/AAPL?refresh=true', '/api/news/AAPL?refresh=1&refresh=0', '/api/news/AAPL?market=US&market=CN']) assert.equal((await f.request(route)).status, 400);
+  const busy = await fetch(`${f.url}/api/news/BUSY`); assert.equal(busy.status, 429); assert.equal(busy.headers.get('retry-after'), '6');
+});
+test('慢新闻请求不阻塞榜单和持仓API、不改变行情时间和持仓revision', async t => {
+  let resolve, closed = false;
+  const f = await fixture(t, { newsService: { get: () => new Promise(r => { resolve = r; }), close() { closed = true; } } });
+  const pending = f.request('/api/news/AAPL');
+  while (!resolve) await new Promise(setImmediate);
+  await f.scanner.refresh('US');
+  const before = f.scanner.snapshot('US');
+  assert.equal((await f.request('/api/scanner/gainers')).status, 200);
+  assert.equal((await f.request('/api/positions')).status, 200);
+  resolve({ status: 'unavailable', items: [] }); await pending;
+  const after = f.scanner.snapshot('US'); assert.equal(after.lastUpdateTime, before.lastUpdateTime); assert.equal(after.positionsRevision, before.positionsRevision); assert.equal(after.dataError, before.dataError);
+  await f.scanner.stop(); assert.equal(closed, true);
+});
 test('榜单源失败保留数据/成功时间；独立持仓报价仍更新且不会假装过期价新鲜', async t => {
   const f = await fixture(t);
   await f.scanner.refresh('US');

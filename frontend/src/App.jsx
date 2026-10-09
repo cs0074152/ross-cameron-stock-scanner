@@ -1,8 +1,16 @@
-import { useState, useEffect, useRef, useMemo, useCallback, memo, lazy, Suspense } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo, lazy, Suspense, Component } from 'react';
 import QuoteTime from './QuoteTime.jsx';
 import { selectScannerRows, sameStockRowProps, scheduleAfterPaint } from './scanner-view.js';
 
 const StrategyView = lazy(() => import('./StrategyCenter.jsx'));
+const NewsView = lazy(() => import('./NewsPanel.jsx'));
+class NewsLoadBoundary extends Component {
+  state = { failed: false };
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed ? <section className="news-panel"><p role="alert">新闻来源核查面板加载失败。</p><button className="btn" onClick={() => window.location.reload()}>重新加载页面</button></section> : this.props.children;
+  }
+}
 const EMPTY_LIST = [];
 import { marketDate, quoteMillis, isQuoteStale, chartMetadata, latestStockQuotes, updatePriceHistory, positionMirror, positionVersion, createOperationGate, normalizeLedger, currentTrade, changeTrade, appendReceipt, requestJson } from './scanner-state.js';
 
@@ -452,10 +460,10 @@ const TradingViewChart = memo(function TradingViewChart({ symbol, stock, market,
 function presetDescription(preset, market) {
   const rules = {
     all: '当前类别榜单，不是全市场股票；自定义条件只在该样本内生效。',
-    docPick: '涨幅 >10%、量比 ≥5、价格 $2–$20、流通盘 <2000 万股；新闻需人工确认。',
-    docPickStrict: '涨幅 >30%、量比 ≥5、价格 $5–$10、流通盘 <1000 万股；新闻需人工确认。',
-    fivePillars: '仅价格 $1–$20、涨跌幅绝对值 ≥10%；未验证流通盘、跳空、量比或新闻。',
-    strictFivePillars: '价格 $1–$20、流通盘 <1000 万、跳空 ≥4%、量比 ≥2、涨跌幅绝对值 ≥10%；新闻并未自动核实。',
+    docPick: '涨幅 >10%、量比 ≥5、价格 $2–$20、流通盘 <2000 万股；来源可自动核查；具体事实需查看原文。',
+    docPickStrict: '涨幅 >30%、量比 ≥5、价格 $5–$10、流通盘 <1000 万股；来源可自动核查；具体事实需查看原文。',
+    fivePillars: '仅价格 $1–$20、涨跌幅绝对值 ≥10%；未验证流通盘、跳空或量比。此筛选仅含数值；新闻来源见核查面板。',
+    strictFivePillars: '价格 $1–$20、流通盘 <1000 万、跳空 ≥4%、量比 ≥2、涨跌幅绝对值 ≥10%；来源可自动核查；具体事实需查看原文。',
     hodMomentum: '涨幅 ≥5%、距当日最高价 ≤0.2%；不是逐笔突破信号。',
     gapScanner: '真实开盘价相对昨收跳空的绝对值 ≥4%；开盘价未知时不以涨幅替代。'
   };
@@ -706,9 +714,9 @@ function App() {
     {showStale && <div className="data-error" role="status">行情源报价超过 3 分钟或时间未知；抓取成功不代表价格已更新，监控暂停使用过期行情。</div>}
     {dataError && <div className="data-error" role="status">{dataError}</div>}{actionError && <div className="action-error" role="alert">{actionError}<button className="btn secondary" onClick={() => setActionError(null)}>关闭提示</button></div>}
     <MarketStats gainers={stocks.gainers || EMPTY_LIST} losers={stocks.losers || EMPTY_LIST} market={market} />
-    {view === 'scanner' ? <main className="app-main"><div className="left-panel"><Scanner key={market} stocks={displayStocks} selectedSymbol={selectedSymbol} onSelectSymbol={selectSymbol} title={market === 'CN' ? 'A 股扫描器' : '美股扫描器'} scannerPreset={scannerPreset} onPresetChange={setScannerPreset} category={category} onCategoryChange={setCategory} session={session} dataDate={dataDate} history={priceHistory} market={market} dataError={dataError} lastUpdate={lastUpdate} scope={scope} now={clockTick} /></div><div className="right-panel"><TradingViewChart key={market} symbol={selectedSymbol} stock={selectedStock} market={market} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} theme={theme} /></div></main> : <main className="app-main"><Suspense fallback={<div className="empty-hint" role="status">正在加载策略与持仓页面…</div>}><StrategyView key={market} market={market} stocks={stocks} selectedStock={selectedStock} trade={trade} setTrade={setTrade} onMarkBuy={markPosition} onClosePosition={closePosition} onAdjustPosition={adjustPosition} pending={pending} historyDates={ledgers[market].sessions} scope={scope} calendarKnown={calendarKnown} session={session} etMeta={marketMeta} selectedSymbol={selectedSymbol} onOpenPreset={id => { setScannerPreset(id); setView('scanner'); }} /></Suspense></main>}
+    {view === 'scanner' ? <main className="app-main"><div className="left-panel"><Scanner key={market} stocks={displayStocks} selectedSymbol={selectedSymbol} onSelectSymbol={selectSymbol} title={market === 'CN' ? 'A 股扫描器' : '美股扫描器'} scannerPreset={scannerPreset} onPresetChange={setScannerPreset} category={category} onCategoryChange={setCategory} session={session} dataDate={dataDate} history={priceHistory} market={market} dataError={dataError} lastUpdate={lastUpdate} scope={scope} now={clockTick} /></div><div className="right-panel"><TradingViewChart key={market} symbol={selectedSymbol} stock={selectedStock} market={market} isFullscreen={isFullscreen} onToggleFullscreen={toggleFullscreen} theme={theme} />{selectedSymbol ? <NewsLoadBoundary><Suspense fallback={<section className="news-panel" role="status">正在加载新闻来源核查…</section>}><NewsView apiBase={API_BASE} market={market} symbol={selectedSymbol} /></Suspense></NewsLoadBoundary> : <section className="news-panel news-empty">新闻来源核查：点击榜单股票，自动检查来源记录。</section>}</div></main> : <main className="app-main"><Suspense fallback={<div className="empty-hint" role="status">正在加载策略与持仓页面…</div>}><StrategyView key={market} market={market} stocks={stocks} selectedStock={selectedStock} trade={trade} setTrade={setTrade} onMarkBuy={markPosition} onClosePosition={closePosition} onAdjustPosition={adjustPosition} pending={pending} historyDates={ledgers[market].sessions} scope={scope} calendarKnown={calendarKnown} session={session} etMeta={marketMeta} selectedSymbol={selectedSymbol} onOpenPreset={id => { setScannerPreset(id); setView('scanner'); }} /></Suspense></main>}
     <footer className="app-footer">
-      <div className="footer-meta"><div className="footer-info"><span>{market === 'CN' ? '成交量：股 | 流通股数：流通市值估算 | 量比：行情源口径 | 仅榜单样本' : '美股榜单样本 | 条件与数据来源见扫描器说明 | 新闻催化需人工确认'}</span></div><div className="footer-disclaimer">数据：{dataSource || '加载中'} | 图表：TradingView（行情时效独立）</div></div>
+      <div className="footer-meta"><div className="footer-info"><span>{market === 'CN' ? '成交量：股 | 流通股数：流通市值估算 | 量比：行情源口径 | 仅榜单样本' : '美股榜单样本 | 条件与数据来源见扫描器说明 | 来源可自动核查；具体事实需查看原文'}</span></div><div className="footer-disclaimer">数据：{dataSource || '加载中'} | 图表：TradingView（行情时效独立）</div></div>
       <details className="usage-disclaimer">
         <summary>免责声明：使用风险及损失自担；作者在法律允许范围内免责。点击查看详情</summary>
         <div className="disclaimer-body">

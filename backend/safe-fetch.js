@@ -1,6 +1,6 @@
 const net = require('node:net');
 const DEFAULT_ALLOWLIST = new Set([
-  'stockanalysis.com', 'query1.finance.yahoo.com', 'fc.yahoo.com', 'push2.eastmoney.com'
+  'stockanalysis.com', 'query1.finance.yahoo.com', 'fc.yahoo.com', 'push2.eastmoney.com', 'www.cninfo.com.cn'
 ]);
 
 function reservedAddress(host) {

@@ -9,6 +9,11 @@ test('strategy code loads separately from the scanner entry without writing buil
   const chunks = outputs.filter(item => item.type === 'chunk');
   const entry = chunks.find(item => item.isEntry);
   const strategy = chunks.find(item => Object.keys(item.modules).some(id => id.replaceAll('\\', '/').endsWith('/src/StrategyCenter.jsx')));
+  const news = chunks.find(item => Object.keys(item.modules).some(id => id.replaceAll('\\', '/').endsWith('/src/NewsPanel.jsx')));
+  assert.ok(news);
+  assert.notEqual(news, entry);
+  assert.ok(entry.dynamicImports.includes(news.fileName));
+  assert.ok(!Object.keys(entry.modules).some(id => id.replaceAll('\\', '/').endsWith('/src/NewsPanel.jsx')));
   assert.ok(entry);
   assert.ok(strategy);
   assert.notEqual(strategy, entry);
